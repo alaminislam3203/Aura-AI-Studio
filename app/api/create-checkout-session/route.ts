@@ -40,6 +40,11 @@ export async function POST(request: Request) {
     const origin =
       request.headers.get("origin") ||
       request.headers.get("referer")?.replace(/\/$/, "") ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : undefined) ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
       process.env.NEXTAUTH_URL ||
       "http://localhost:3000";
 
