@@ -1,19 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { PlaygroundWorkbench } from "@/components/playground/PlaygroundWorkbench";
 import { ApiConfigModal } from "@/components/modals/ApiConfigModal";
 import { getCustomImageKitConfig, BYOK_CHANGE_EVENT } from "@/lib/byok-storage";
-import { ArrowLeftIcon, CrownIcon, KeyRoundIcon, LogInIcon, LogOutIcon, SparklesIcon } from "lucide-react";
+import { isAdminEmail } from "@/lib/admin-auth";
+import {
+  ArrowLeftIcon,
+  CrownIcon,
+  KeyRoundIcon,
+  LogInIcon,
+  LogOutIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+} from "lucide-react";
 
 export default function PlaygroundPage() {
   const { data: session, status } = useSession();
   const user = session?.user as any;
   const isPro = user?.plan === "PRO";
+  const isAdmin = isAdminEmail(user?.email);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [hasCustomConfig, setHasCustomConfig] = useState(false);
 
@@ -33,25 +42,35 @@ export default function PlaygroundPage() {
         <header className="mb-5 flex items-center justify-between gap-2 sm:mb-8">
           {/* Left: Back Home + Logo */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-muted-foreground transition-all hover:border-primary/50 hover:bg-white/10 hover:text-foreground shrink-0"
+              title="Back Home"
+            >
+              <ArrowLeftIcon className="size-3.5" />
+              <span className="hidden sm:inline">Back Home</span>
+            </Link>
 
-              <Link href="/" className="home-brand">
-              <span className="relative mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-visible sm:mr-2 sm:h-10 sm:w-10">
-                <Image
-                  src="/logo.png"
-                  alt="Aura Studio"
-                  width={500}
-                  height={500}
-                  unoptimized
-                  className="h-9 w-9 max-h-none max-w-none origin-left scale-[1.5] object-contain sm:h-10 sm:w-10 sm:scale-[1.55]"
-                  priority
-                />
-              </span>
+            <Link href="/" className="group flex min-w-0 items-center gap-2 sm:gap-3">
+              <p className="font-mono text-xl sm:text-2xl font-bold uppercase tracking-wider text-primary truncate">
+                Aura Studio
+              </p>
             </Link>
           </div>
 
           {/* Right: User status & actions */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            {isAdmin && (
+              <Link
+                href="/admin-vault"
+                className="flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 sm:px-3 py-1 text-xs font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:border-emerald-500/60"
+                title="Open Admin Vault"
+              >
+                <ShieldCheckIcon className="size-3.5" />
+                <span className="hidden sm:inline">Admin Vault</span>
+              </Link>
+            )}
+
             {/* BYOK ImageKit Configuration Button */}
             <button
               type="button"

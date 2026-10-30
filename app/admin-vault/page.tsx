@@ -3,27 +3,25 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
-import Image from "next/image";
 import {
-  ArrowLeftIcon,
-  CheckCircle2Icon,
-  ChevronRightIcon,
+  BarChart3Icon,
   CrownIcon,
   DownloadIcon,
   ExternalLinkIcon,
   EyeIcon,
   ImageIcon,
-  KeyRoundIcon,
   LayersIcon,
   Loader2Icon,
   LockIcon,
   LogInIcon,
   LogOutIcon,
+  PlusCircleIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
   SearchIcon,
   ShieldAlertIcon,
   ShieldCheckIcon,
-  SparklesIcon,
+  Trash2Icon,
   UsersIcon,
   WalletIcon,
   XIcon,
@@ -40,6 +38,12 @@ interface AdminStats {
   totalSubscriptions: number;
   activeSubscriptions: number;
   estimatedMrr: number;
+}
+
+interface ToolBreakdownItem {
+  toolType: string;
+  count: number;
+  percentage: number;
 }
 
 interface AdminUser {
@@ -91,11 +95,14 @@ export default function AdminVaultPage() {
   const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState<"users" | "generations" | "subscriptions">("users");
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [toolBreakdown, setToolBreakdown] = useState<ToolBreakdownItem[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [generations, setGenerations] = useState<AdminGeneration[]>([]);
   const [subscriptions, setSubscriptions] = useState<AdminSubscription[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [planFilter, setPlanFilter] = useState<"ALL" | "PRO" | "FREE">("ALL");
   const [selectedGeneration, setSelectedGeneration] = useState<AdminGeneration | null>(null);
 
   const isAuthorized = useMemo(() => {
@@ -113,6 +120,7 @@ export default function AdminVaultPage() {
       }
       const data = await res.json();
       setStats(data.stats);
+      setToolBreakdown(data.toolBreakdown || []);
       setUsers(data.users || []);
       setGenerations(data.generations || []);
       setSubscriptions(data.subscriptions || []);
@@ -129,30 +137,63 @@ export default function AdminVaultPage() {
     }
   }, [isAuthorized]);
 
+  const runAdminAction = async (payload: {
+    action: "togglePlan" | "resetCredits" | "addBonusCredits" | "deleteUser" | "deleteGeneration";
+    userId?: string;
+    generationId?: string;
+  }) => {
+    const busyKey = payload.userId || payload.generationId || payload.action;
+    try {
+      setActionBusyId(busyKey);
+      const res = await fetch("/api/admin/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to execute action");
+      }
+      toast.success(data.message || "Action completed");
+      if (payload.action === "deleteGeneration" && selectedGeneration?.id === payload.generationId) {
+        setSelectedGeneration(null);
+      }
+      await fetchAdminData();
+    } catch (err: any) {
+      toast.error(err.message || "Admin action failed");
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
   // Filtered Users
   const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) return users;
-    const q = searchQuery.toLowerCase();
-    return users.filter(
-      (u) =>
+    return users.filter((u) => {
+      if (planFilter !== "ALL" && u.plan !== planFilter) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
         (u.name && u.name.toLowerCase().includes(q)) ||
         u.email.toLowerCase().includes(q) ||
         (u.stripeCustomerId && u.stripeCustomerId.toLowerCase().includes(q))
-    );
-  }, [users, searchQuery]);
+      );
+    });
+  }, [users, searchQuery, planFilter]);
 
   // Filtered Generations
   const filteredGenerations = useMemo(() => {
-    if (!searchQuery.trim()) return generations;
-    const q = searchQuery.toLowerCase();
-    return generations.filter(
-      (g) =>
+    return generations.filter((g) => {
+      if (planFilter !== "ALL" && g.user.plan !== planFilter) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
         g.toolType.toLowerCase().includes(q) ||
         (g.prompt && g.prompt.toLowerCase().includes(q)) ||
         (g.user.name && g.user.name.toLowerCase().includes(q)) ||
         g.user.email.toLowerCase().includes(q)
-    );
-  }, [generations, searchQuery]);
+      );
+    });
+  }, [generations, searchQuery, planFilter]);
 
   // Filtered Subscriptions
   const filteredSubscriptions = useMemo(() => {
@@ -166,6 +207,60 @@ export default function AdminVaultPage() {
         s.user.email.toLowerCase().includes(q)
     );
   }, [subscriptions, searchQuery]);
+
+  const handleExportCsv = () => {
+    let headers: string[] = [];
+    let rows: string[][] = [];
+
+    if (activeTab === "users") {
+      headers = ["ID", "Name", "Email", "Plan", "UsageCount", "UsageLimit", "StripeCustomerId", "JoinedAt"];
+      rows = filteredUsers.map((u) => [
+        u.id,
+        u.name || "",
+        u.email,
+        u.plan,
+        String(u.usageCount),
+        String(u.usageLimit),
+        u.stripeCustomerId || "",
+        u.createdAt,
+      ]);
+    } else if (activeTab === "generations") {
+      headers = ["ID", "UserEmail", "Plan", "ToolType", "Prompt", "ResultURL", "CreatedAt"];
+      rows = filteredGenerations.map((g) => [
+        g.id,
+        g.user.email,
+        g.user.plan,
+        g.toolType,
+        g.prompt || "",
+        g.resultImageUrl,
+        g.createdAt,
+      ]);
+    } else {
+      headers = ["ID", "UserEmail", "StripeSubscriptionId", "StripeCustomerId", "Status", "CreatedAt"];
+      rows = filteredSubscriptions.map((s) => [
+        s.id,
+        s.user.email,
+        s.stripeSubscriptionId,
+        s.stripeCustomerId,
+        s.status,
+        s.createdAt,
+      ]);
+    }
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `aura-admin-${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} ${activeTab} records to CSV.`);
+  };
 
   // =========================================================================
   // 1. Loading State
@@ -268,8 +363,8 @@ export default function AdminVaultPage() {
         {/* Top Header Bar */}
         <header className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-card/40 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 backdrop-blur-2xl shadow-[0_16px_40px_rgba(0,0,0,0.6)]">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 group">
-              <span className="relative flex size-9 items-center justify-center rounded-xl bg-primary/15 border border-primary/40 text-primary">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <span className="relative flex size-10 items-center justify-center rounded-xl bg-primary/15 border border-primary/40 text-primary">
                 <ShieldCheckIcon className="size-5" />
               </span>
               <div>
@@ -282,13 +377,24 @@ export default function AdminVaultPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Unlinked command center for user metrics, images & subscriptions
+                  Full command center for user plans, credits, AI moderation & subscriptions
                 </p>
               </div>
             </Link>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              className="h-8 rounded-full border-white/15 bg-white/5 px-3 text-xs text-foreground hover:bg-white/10 cursor-pointer"
+            >
+              <DownloadIcon className="mr-1.5 size-3.5 text-primary" />
+              Export CSV
+            </Button>
+
             <Button
               type="button"
               variant="outline"
@@ -324,7 +430,6 @@ export default function AdminVaultPage() {
 
         {/* Overview KPI Cards */}
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          {/* Card 1: Users */}
           <div className="rounded-2xl border border-white/10 bg-card/40 p-4 backdrop-blur-xl">
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-medium">Registered Users</span>
@@ -340,7 +445,6 @@ export default function AdminVaultPage() {
             </div>
           </div>
 
-          {/* Card 2: Generations */}
           <div className="rounded-2xl border border-white/10 bg-card/40 p-4 backdrop-blur-xl">
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-medium">Total AI Edits</span>
@@ -350,11 +454,10 @@ export default function AdminVaultPage() {
               {stats?.totalGenerations ?? 0}
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
-              Across all 10 native studio tools
+              Across all 16 native studio tools
             </div>
           </div>
 
-          {/* Card 3: Active Subscriptions */}
           <div className="rounded-2xl border border-white/10 bg-card/40 p-4 backdrop-blur-xl">
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-medium">Active Subscriptions</span>
@@ -364,11 +467,10 @@ export default function AdminVaultPage() {
               {stats?.activeSubscriptions ?? 0}
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
-              {stats?.totalSubscriptions ?? 0} total lifetime records
+              {stats?.totalSubscriptions ?? 0} Stripe billing records
             </div>
           </div>
 
-          {/* Card 4: Estimated MRR */}
           <div className="rounded-2xl border border-white/10 bg-card/40 p-4 backdrop-blur-xl">
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-medium">Estimated MRR</span>
@@ -383,50 +485,109 @@ export default function AdminVaultPage() {
           </div>
         </section>
 
-        {/* Navigation Tabs & Search Controls */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-card/30 p-3 sm:flex-row sm:items-center sm:justify-between backdrop-blur-xl">
-          <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 p-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab("users")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "users"
-                  ? "bg-primary text-black shadow-md font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <UsersIcon className="size-3.5" />
-              <span>Users ({users.length})</span>
-            </button>
+        {/* AI Tool Popularity Analytics Breakdown */}
+        {toolBreakdown.length > 0 && (
+          <section className="rounded-3xl border border-white/10 bg-card/35 p-4 sm:p-5 backdrop-blur-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3Icon className="size-4 text-primary" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+                  AI Tool Usage Distribution
+                </h2>
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                Top {Math.min(6, toolBreakdown.length)} tools
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {toolBreakdown.slice(0, 6).map((item) => (
+                <div
+                  key={item.toolType}
+                  className="rounded-xl border border-white/8 bg-black/30 p-3 space-y-1.5"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-white truncate">{item.toolType}</span>
+                    <span className="font-mono text-[11px] text-primary font-bold">
+                      {item.count} ({item.percentage}%)
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-primary to-amber-400"
+                      style={{ width: `${Math.max(4, item.percentage)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-            <button
-              type="button"
-              onClick={() => setActiveTab("generations")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "generations"
-                  ? "bg-primary text-black shadow-md font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <LayersIcon className="size-3.5" />
-              <span>Image Uploads ({generations.length})</span>
-            </button>
+        {/* Navigation Tabs, Plan Filter & Search Controls */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-card/30 p-3 lg:flex-row lg:items-center lg:justify-between backdrop-blur-xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("users")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "users"
+                    ? "bg-primary text-black shadow-md font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <UsersIcon className="size-3.5" />
+                <span>Users ({filteredUsers.length})</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab("subscriptions")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "subscriptions"
-                  ? "bg-primary text-black shadow-md font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <CrownIcon className="size-3.5" />
-              <span>Subscriptions ({subscriptions.length})</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("generations")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "generations"
+                    ? "bg-primary text-black shadow-md font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <LayersIcon className="size-3.5" />
+                <span>Image Uploads ({filteredGenerations.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("subscriptions")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "subscriptions"
+                    ? "bg-primary text-black shadow-md font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <CrownIcon className="size-3.5" />
+                <span>Subscriptions ({filteredSubscriptions.length})</span>
+              </button>
+            </div>
+
+            {activeTab !== "subscriptions" && (
+              <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-black/40 p-1 text-[11px]">
+                {(["ALL", "PRO", "FREE"] as const).map((tier) => (
+                  <button
+                    key={tier}
+                    type="button"
+                    onClick={() => setPlanFilter(tier)}
+                    className={`rounded-lg px-2.5 py-1 font-semibold transition-all cursor-pointer ${
+                      planFilter === tier
+                        ? "bg-white/15 text-white"
+                        : "text-muted-foreground hover:text-white"
+                    }`}
+                  >
+                    {tier}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full lg:w-72">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <input
               type="text"
@@ -438,7 +599,7 @@ export default function AdminVaultPage() {
           </div>
         </div>
 
-        {/* Tab 1: Users Table */}
+        {/* Tab 1: Users Table with Operator Controls */}
         {activeTab === "users" && (
           <div className="overflow-hidden rounded-3xl border border-white/10 bg-card/40 backdrop-blur-xl shadow-lg">
             <div className="overflow-x-auto">
@@ -448,73 +609,126 @@ export default function AdminVaultPage() {
                     <th className="px-5 py-3.5">User</th>
                     <th className="px-4 py-3.5">Plan</th>
                     <th className="px-4 py-3.5">Usage / Limit</th>
-                    <th className="px-4 py-3.5">Stripe Customer</th>
                     <th className="px-4 py-3.5">Joined Date</th>
+                    <th className="px-5 py-3.5 text-right">Operator Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-sans">
                   {filteredUsers.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">
-                        No registered users found.
+                        No registered users found matching criteria.
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            {user.image ? (
-                              <img
-                                src={user.image}
-                                alt={user.name || "User"}
-                                className="size-8 rounded-full border border-white/15 object-cover"
-                              />
-                            ) : (
-                              <div className="flex size-8 items-center justify-center rounded-full bg-white/10 font-bold text-foreground">
-                                {user.name?.[0] || user.email[0].toUpperCase()}
+                    filteredUsers.map((user) => {
+                      const isBusy = actionBusyId === user.id;
+                      return (
+                        <tr key={user.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              {user.image ? (
+                                <img
+                                  src={user.image}
+                                  alt={user.name || "User"}
+                                  className="size-8 rounded-full border border-white/15 object-cover"
+                                />
+                              ) : (
+                                <div className="flex size-8 items-center justify-center rounded-full bg-white/10 font-bold text-foreground">
+                                  {user.name?.[0] || user.email[0].toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-semibold text-white">{user.name || "Anonymous User"}</div>
+                                <div className="text-[11px] text-muted-foreground font-mono">{user.email}</div>
                               </div>
-                            )}
-                            <div>
-                              <div className="font-semibold text-white">{user.name || "Anonymous User"}</div>
-                              <div className="text-[11px] text-muted-foreground font-mono">{user.email}</div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          {user.plan === "PRO" ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
-                              <CrownIcon className="size-3" /> PRO
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                              FREE
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5 font-mono text-[11px]">
-                          {user.plan === "PRO" ? (
-                            <span className="text-amber-300 font-semibold">Unlimited (8/hr)</span>
-                          ) : (
-                            <span>{user.usageCount} of {user.usageLimit} edits</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5 font-mono text-[11px] text-muted-foreground">
-                          {user.stripeCustomerId ? (
-                            <span className="text-zinc-300">{user.stripeCustomerId}</span>
-                          ) : (
-                            <span className="text-zinc-600">None</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5 text-muted-foreground text-[11px]">
-                          {new Date(user.createdAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {user.plan === "PRO" ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
+                                <CrownIcon className="size-3" /> PRO
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                FREE
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 font-mono text-[11px]">
+                            {user.plan === "PRO" ? (
+                              <span className="text-amber-300 font-semibold">
+                                {user.usageCount} total (15/hr cap)
+                              </span>
+                            ) : (
+                              <span>
+                                {user.usageCount} of {user.usageLimit} edits
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-muted-foreground text-[11px]">
+                            {new Date(user.createdAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </td>
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => runAdminAction({ action: "togglePlan", userId: user.id })}
+                                className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition-all cursor-pointer ${
+                                  user.plan === "PRO"
+                                    ? "border-white/15 bg-white/5 text-zinc-300 hover:bg-white/10"
+                                    : "border-amber-400/40 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20"
+                                }`}
+                                title={user.plan === "PRO" ? "Downgrade to FREE" : "Upgrade to PRO"}
+                              >
+                                {user.plan === "PRO" ? "Set FREE" : "Make PRO"}
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => runAdminAction({ action: "resetCredits", userId: user.id })}
+                                className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-white/10 hover:text-white cursor-pointer"
+                                title="Reset usage count to 0"
+                              >
+                                <RotateCcwIcon className="size-3" /> Reset
+                              </button>
+
+                              {user.plan === "FREE" && (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => runAdminAction({ action: "addBonusCredits", userId: user.id })}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/20 cursor-pointer"
+                                  title="Add +5 bonus free credits"
+                                >
+                                  <PlusCircleIcon className="size-3" /> +5
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => {
+                                  if (window.confirm(`Delete user ${user.email} and all their generations?`)) {
+                                    runAdminAction({ action: "deleteUser", userId: user.id });
+                                  }
+                                }}
+                                className="inline-flex items-center justify-center rounded-lg border border-rose-500/30 bg-rose-500/10 p-1 text-rose-400 hover:bg-rose-500/20 cursor-pointer"
+                                title="Delete User"
+                              >
+                                <Trash2Icon className="size-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -536,7 +750,6 @@ export default function AdminVaultPage() {
                     key={gen.id}
                     className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-card/50 backdrop-blur-xl transition-all hover:border-primary/40 hover:shadow-[0_8px_25px_rgba(0,0,0,0.7)]"
                   >
-                    {/* Visual Comparison Split View */}
                     <div
                       onClick={() => setSelectedGeneration(gen)}
                       className="relative aspect-[16/10] w-full overflow-hidden bg-black/60 cursor-pointer"
@@ -556,7 +769,6 @@ export default function AdminVaultPage() {
                       </div>
                     </div>
 
-                    {/* Metadata Card Footer */}
                     <div className="p-3.5 space-y-2">
                       <div className="flex items-center justify-between text-[11px]">
                         <div className="flex items-center gap-2 truncate">
@@ -590,17 +802,33 @@ export default function AdminVaultPage() {
                       )}
 
                       <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground border-t border-white/5">
-                        <span className="truncate max-w-[170px] font-mono">
+                        <span className="truncate max-w-[150px] font-mono">
                           {gen.originalFileName || "Uploaded Asset"}
                         </span>
-                        <a
-                          href={gen.resultImageUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary hover:underline inline-flex items-center gap-1 font-semibold"
-                        >
-                          View Direct <ExternalLinkIcon className="size-2.5" />
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={gen.resultImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline inline-flex items-center gap-1 font-semibold"
+                          >
+                            View Direct <ExternalLinkIcon className="size-2.5" />
+                          </a>
+                          <button
+                            type="button"
+                            disabled={actionBusyId === gen.id}
+                            onClick={() =>
+                              runAdminAction({
+                                action: "deleteGeneration",
+                                generationId: gen.id,
+                              })
+                            }
+                            className="rounded p-1 text-rose-400 hover:bg-rose-500/20 cursor-pointer"
+                            title="Delete Generation"
+                          >
+                            <Trash2Icon className="size-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -748,17 +976,35 @@ export default function AdminVaultPage() {
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-              <Button asChild size="sm" variant="outline" className="rounded-xl text-xs">
-                <a href={selectedGeneration.originalImageUrl} target="_blank" rel="noreferrer">
-                  Open Original <ExternalLinkIcon className="ml-1.5 size-3" />
-                </a>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/10">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={actionBusyId === selectedGeneration.id}
+                onClick={() =>
+                  runAdminAction({
+                    action: "deleteGeneration",
+                    generationId: selectedGeneration.id,
+                  })
+                }
+                className="rounded-xl border-rose-500/30 bg-rose-500/10 text-xs text-rose-400 hover:bg-rose-500/20 cursor-pointer"
+              >
+                <Trash2Icon className="mr-1.5 size-3.5" /> Delete Record
               </Button>
-              <Button asChild size="sm" className="studio-primary-action rounded-xl text-xs font-semibold">
-                <a href={selectedGeneration.resultImageUrl} target="_blank" rel="noreferrer">
-                  Open Result <ExternalLinkIcon className="ml-1.5 size-3" />
-                </a>
-              </Button>
+
+              <div className="flex items-center gap-2">
+                <Button asChild size="sm" variant="outline" className="rounded-xl text-xs">
+                  <a href={selectedGeneration.originalImageUrl} target="_blank" rel="noreferrer">
+                    Open Original <ExternalLinkIcon className="ml-1.5 size-3" />
+                  </a>
+                </Button>
+                <Button asChild size="sm" className="studio-primary-action rounded-xl text-xs font-semibold">
+                  <a href={selectedGeneration.resultImageUrl} target="_blank" rel="noreferrer">
+                    Open Result <ExternalLinkIcon className="ml-1.5 size-3" />
+                  </a>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
