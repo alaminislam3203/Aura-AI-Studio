@@ -50,3 +50,5 @@ next-env.d.ts
 # reference files
 idea/
 imagekit-sdk-llm-docs.txt
+
+.vercel
