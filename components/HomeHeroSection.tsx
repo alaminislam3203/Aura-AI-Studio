@@ -132,21 +132,22 @@ export function HomeHeroSection() {
               <span className="relative mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-visible sm:mr-2 sm:h-10 sm:w-10">
                 <Image
                   src="/logo.png"
-                  alt="Aura AI Studio"
-                  width={72}
-                  height={72}
-                  className="h-9 w-9 max-h-none max-w-none origin-left scale-[1.5] object-cover sm:h-10 sm:w-10 sm:scale-[1.55]"
+                  alt="Aura Studio"
+                  width={500}
+                  height={500}
+                  unoptimized
+                  className="h-9 w-9 max-h-none max-w-none origin-left scale-[1.5] object-contain sm:h-10 sm:w-10 sm:scale-[1.55]"
                   priority
                 />
               </span>
-              {/* <div className="min-w-0">
+              <div className="min-w-0">
                 <span className="caps-2xs block text-xs font-semibold text-foreground sm:text-sm whitespace-nowrap">
-                  Aura AI Studio
+                  Aura Studio
                 </span>
                 <span className="caps-xs hidden sm:block truncate text-[10px] uppercase text-primary sm:text-xs">
                   AI Image Studio
                 </span>
-              </div> */}
+              </div>
             </Link>
 
             <div className="hidden md:flex items-center justify-center gap-1.5 lg:gap-2.5">
@@ -439,18 +440,6 @@ export function HomeHeroSection() {
                     <span className="size-2.5 sm:size-3 rounded-full bg-[#ffbd2e]/90 border border-[#dea123]/50 shadow-[0_0_6px_rgba(255,189,46,0.5)]" />
                     <span className="size-2.5 sm:size-3 rounded-full bg-[#27c93f]/90 border border-[#1aab29]/50 shadow-[0_0_6px_rgba(39,201,63,0.5)]" />
                   </div>
-
-                  {/* Browser URL / Live Engine Status Pill */}
-                  {/* <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/75 shadow-inner">
-                    <span className="relative flex h-2 w-2">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                    </span>
-                    <span className="font-mono text-[10px] sm:text-[11px] tracking-wide text-zinc-300">
-                      aura.studio/playground
-                    </span>
-                   
-                  </div> */}
 
                   {/* Quick Action to Playground - Hidden on mobile to avoid overflow/wrapping */}
                   <Link
