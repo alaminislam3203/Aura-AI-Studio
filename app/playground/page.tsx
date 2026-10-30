@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { PlaygroundWorkbench } from "@/components/playground/PlaygroundWorkbench";
@@ -129,11 +129,13 @@ export default function PlaygroundPage() {
               </div>
             ) : (
               <Button
+                asChild
                 size="sm"
-                onClick={() => signIn("google")}
                 className="studio-primary-action h-7 sm:h-8 rounded-full px-3 sm:px-4 text-xs font-semibold"
               >
-                <LogInIcon className="mr-1 size-3" /> Sign In
+                <Link href="/login">
+                  <LogInIcon className="mr-1 size-3" /> Sign In
+                </Link>
               </Button>
             )}
           </div>

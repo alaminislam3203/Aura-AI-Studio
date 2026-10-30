@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import {
   ArrowUpRightIcon,
   ChevronDownIcon,
@@ -10,10 +10,8 @@ import {
   LogOutIcon,
   MenuIcon,
   ShieldCheckIcon,
-  SparklesIcon,
   Wand2Icon,
   XIcon,
-  ZapIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -246,13 +244,14 @@ export function HomeHeroSection() {
               ) : (
                 <div className="flex items-center gap-2">
                   <Button
-                    type="button"
+                    asChild
                     variant="outline"
                     size="sm"
-                    onClick={() => signIn("google")}
                     className="home-btn-signin hidden sm:inline-flex"
                   >
-                    <LogInIcon className="mr-1.5 size-3.5" /> Sign In
+                    <Link href="/login">
+                      <LogInIcon className="mr-1.5 size-3.5" /> Sign In
+                    </Link>
                   </Button>
 
                   <Button
@@ -360,16 +359,16 @@ export function HomeHeroSection() {
                 ) : (
                   <div className="flex flex-col gap-2">
                     <Button
-                      type="button"
+                      asChild
                       variant="outline"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        signIn("google");
-                      }}
                       className="w-full rounded-full border border-white/20 bg-white/10 py-2 text-xs font-medium text-foreground cursor-pointer"
                     >
-                      <LogInIcon className="mr-2 size-3.5" /> Sign In with
-                      Google
+                      <Link
+                        href="/login"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <LogInIcon className="mr-2 size-3.5" /> Sign In / Create Account
+                      </Link>
                     </Button>
                     <Button asChild className="home-btn-nav-primary w-full">
                       <Link
