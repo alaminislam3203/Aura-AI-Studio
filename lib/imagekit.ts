@@ -32,10 +32,13 @@ export type TransformToolId =
   | "vignette"
   | "sepia"
   | "avatar"
+  | "face-crop"
+  | "smart-crop"
   | "text-watermark"
   | "bg-remove"
   | "bg-remove-pro"
-  | "change-bg";
+  | "change-bg"
+  | "gen-fill";
 
 export interface TransformOptions {
   prompt?: string;
@@ -69,6 +72,10 @@ export function getToolTransformation(toolId: TransformToolId, options?: Transfo
       return "e-sepia,e-contrast";
     case "avatar":
       return "r-max,c-maintain_ratio";
+    case "face-crop":
+      return "w-800,h-800,c-maintain_ratio,fo-face";
+    case "smart-crop":
+      return "w-1000,h-1000,c-maintain_ratio,fo-auto";
     case "bg-remove":
       return "e-bgremove,f-png";
     case "bg-remove-pro":
@@ -76,6 +83,11 @@ export function getToolTransformation(toolId: TransformToolId, options?: Transfo
     case "change-bg": {
       const p = options?.prompt?.trim();
       return p ? `e-changebg-prompt-${encodeURIComponent(p)}` : "e-changebg";
+    }
+    case "gen-fill": {
+      const p = options?.prompt?.trim();
+      const fillParam = p ? `bg-genfill-prompt-${encodeURIComponent(p)}` : "bg-genfill";
+      return `w-1400,h-900,cm-pad_resize,${fillParam}`;
     }
     case "text-watermark": {
       const text = options?.watermarkText?.trim() || "Aura AI Studio";
@@ -110,17 +122,26 @@ export function getToolTransformation(toolId: TransformToolId, options?: Transfo
 }
 
 /**
- * Builds the full transformed ImageKit URL by applying transforms to base image URL
+ * Builds the full transformed ImageKit URL by applying transforms to base image URL.
+ * Supports chaining transforms onto an already-transformed URL.
  */
 export function buildTransformedImageUrl(
   baseImageUrl: string,
   transformations: string[],
 ): string {
   if (!baseImageUrl) return "";
-  const cleanBase = baseImageUrl.split("?")[0];
+  const [cleanBase, queryString] = baseImageUrl.split("?");
   const activeTransforms = transformations.filter(Boolean);
 
-  if (activeTransforms.length === 0) return cleanBase;
+  if (activeTransforms.length === 0) return baseImageUrl;
+
+  if (queryString) {
+    const params = new URLSearchParams(queryString);
+    const existingTr = params.get("tr");
+    if (existingTr) {
+      return `${cleanBase}?tr=${existingTr}:${activeTransforms.join(",")}`;
+    }
+  }
 
   return `${cleanBase}?tr=${activeTransforms.join(",")}`;
 }
