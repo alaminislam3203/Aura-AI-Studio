@@ -22,7 +22,7 @@ import {
   getToolTransformation,
   type TransformToolId,
 } from "@/lib/imagekit";
-import { CheckCircleIcon, SparklesIcon } from "lucide-react";
+import { CheckCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 
 export function PlaygroundWorkbench() {
@@ -73,6 +73,7 @@ export function PlaygroundWorkbench() {
     hourlyRemaining?: number;
     isHourlyCapped?: boolean;
     resetInMinutes?: number;
+    hasStripeCustomer?: boolean;
   } | null>(null);
 
   const [history, setHistory] = useState<GenerationItem[]>([]);
@@ -147,7 +148,7 @@ export function PlaygroundWorkbench() {
       return;
     }
 
-    if (!isPro && usageData && !usageData.canUpload) {
+    if (!isPro && !hasCustomConfig && usageData && !usageData.canUpload) {
       setIsUpgradeModalOpen(true);
       return;
     }
@@ -208,14 +209,14 @@ export function PlaygroundWorkbench() {
       return;
     }
 
-    if (!isPro && usageData && !usageData.canUpload) {
+    if (!isPro && !hasCustomConfig && usageData && !usageData.canUpload) {
       setIsUpgradeModalOpen(true);
       return;
     }
 
-    if (isPro && usageData?.isHourlyCapped) {
+    if (!hasCustomConfig && isPro && usageData?.isHourlyCapped) {
       const waitMin = usageData.resetInMinutes || 1;
-      toast.warning(`Hourly limit reached (${usageData.hourlyLimit || 8} edits/hr). Resets in ${waitMin}m.`);
+      toast.warning(`Hourly limit reached (${usageData.hourlyLimit || 15} edits/hr). Resets in ${waitMin}m.`);
       return;
     }
 
@@ -270,7 +271,14 @@ export function PlaygroundWorkbench() {
 
       setProcessedImage(transformedUrl);
 
-      const usageRes = await fetch("/api/usage", { method: "POST" });
+      const byokHeaders: Record<string, string> = hasCustomConfig
+        ? { "x-byok-active": "true" }
+        : {};
+
+      const usageRes = await fetch("/api/usage", {
+        method: "POST",
+        headers: byokHeaders,
+      });
       if (usageRes.status === 429) {
         const errJson = await usageRes.json();
         toast.warning(errJson.error || "Hourly limit reached. Please wait before generating again.");
@@ -280,7 +288,10 @@ export function PlaygroundWorkbench() {
 
       await fetch("/api/generations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...byokHeaders,
+        },
         body: JSON.stringify({
           originalImageUrl: originalImage,
           originalFileName,
@@ -305,6 +316,25 @@ export function PlaygroundWorkbench() {
     setProcessedImage(resUrl);
     const matched = STUDIO_TOOLS.find((t) => t.name === toolType);
     if (matched) setSelectedTool(matched);
+  };
+
+  const handleChainResult = (resultUrl: string) => {
+    setOriginalImage(resultUrl);
+    setProcessedImage(null);
+    toast.info("Processed result set as source image! Select your next AI tool to chain.");
+  };
+
+  const handleDeleteHistoryItem = async (id: string) => {
+    try {
+      const res = await fetch(`/api/generations?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete generation");
+      setHistory((prev) => prev.filter((item) => item.id !== id));
+      toast.success("Removed from generation history.");
+    } catch {
+      toast.error("Failed to remove item from history.");
+    }
   };
 
   return (
@@ -358,6 +388,7 @@ export function PlaygroundWorkbench() {
             setOriginalImage(url);
             setProcessedImage(null);
           }}
+          onChainResult={handleChainResult}
         />
 
         <ToolControls
@@ -390,6 +421,7 @@ export function PlaygroundWorkbench() {
         history={history}
         isLoading={isLoadingHistory}
         onSelectResult={handleSelectHistory}
+        onDeleteItem={handleDeleteHistoryItem}
       />
 
       <UpgradeModal

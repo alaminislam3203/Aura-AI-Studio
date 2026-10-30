@@ -6,6 +6,7 @@ import {
   CheckCircle2Icon,
   DownloadIcon,
   ImageIcon,
+  LayersIcon,
   Loader2Icon,
   RefreshCwIcon,
   Share2Icon,
@@ -28,6 +29,7 @@ interface CanvasViewerProps {
   onUploadClick: () => void;
   onDropFile?: (file: File) => void;
   onSampleSelect?: (sampleUrl: string) => void;
+  onChainResult?: (resultUrl: string) => void;
 }
 
 const SAMPLE_IMAGES = [
@@ -36,6 +38,8 @@ const SAMPLE_IMAGES = [
     url: "https://ik.imagekit.io/oi8yikpgd/luma-studio-uploads/enhance-two_DtWhr0ifhK.png",
   },
 ];
+
+type ExportFormat = "png" | "webp" | "jpg";
 
 export function CanvasViewer({
   originalImage,
@@ -47,12 +51,14 @@ export function CanvasViewer({
   onUploadClick,
   onDropFile,
   onSampleSelect,
+  onChainResult,
 }: CanvasViewerProps) {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isSplitView, setIsSplitView] = useState(true);
   const [copied, setCopied] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
@@ -107,8 +113,25 @@ export function CanvasViewer({
   const handleDownload = () => {
     const targetUrl = processedImage || originalImage;
     if (!targetUrl) return;
-    const filename = `aura-ai-${activeToolName ? activeToolName.toLowerCase().replace(/\s+/g, "-") : "edit"}-${Date.now()}.png`;
-    saveAs(targetUrl, filename);
+
+    let downloadUrl = targetUrl;
+    if (targetUrl.includes("ik.imagekit.io")) {
+      const [base, query] = targetUrl.split("?");
+      const params = new URLSearchParams(query || "");
+      const existingTr = params.get("tr");
+      if (existingTr) {
+        const cleanedTr = existingTr
+          .split(",")
+          .filter((part) => !part.startsWith("f-"))
+          .join(",");
+        downloadUrl = `${base}?tr=${cleanedTr},f-${exportFormat}`;
+      } else {
+        downloadUrl = `${base}?tr=f-${exportFormat}`;
+      }
+    }
+
+    const filename = `aura-ai-${activeToolName ? activeToolName.toLowerCase().replace(/\s+/g, "-") : "edit"}-${Date.now()}.${exportFormat}`;
+    saveAs(downloadUrl, filename);
   };
 
   const handleCopyLink = () => {
@@ -192,7 +215,7 @@ export function CanvasViewer({
         <div className="pointer-events-none absolute -top-24 -left-24 size-80 rounded-full bg-primary/15 blur-[100px] animate-pulse" />
         <div className="pointer-events-none absolute -bottom-24 -right-24 size-80 rounded-full bg-orange-500/10 blur-[100px]" />
 
-        {/* Top Status Header - Matching the right side Pro bar */}
+        {/* Top Status Header */}
         <div className="flex items-center justify-between rounded-2xl border border-white/12 bg-black/35 p-3 sm:p-3.5 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 items-center justify-center rounded-xl border border-primary/40 bg-primary/15 text-primary shadow-[0_0_12px_rgba(255,140,0,0.2)]">
@@ -278,8 +301,8 @@ export function CanvasViewer({
 
   return (
     <div className="studio-panel relative flex flex-col gap-3 sm:gap-4 rounded-[2rem] border border-white/15 bg-white/[0.03] p-4 sm:p-5 backdrop-blur-2xl shadow-[0_24px_64px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.12)] overflow-hidden">
-      {/* Top Toolbar - Glassy Responsive Single Row */}
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-white/12 bg-black/40 px-3 py-2 sm:px-4 sm:py-2.5 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
+      {/* Top Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/12 bg-black/40 px-3 py-2 sm:px-4 sm:py-2.5 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           {processedImage && (
             <Button
@@ -294,7 +317,20 @@ export function CanvasViewer({
             </Button>
           )}
 
-          {activeToolName && (
+          {processedImage && onChainResult && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onChainResult(processedImage)}
+              className="rounded-full border-primary/40 bg-primary/10 h-8 px-2.5 sm:px-3 text-xs font-semibold text-primary hover:bg-primary/20 cursor-pointer transition-all shrink-0"
+              title="Use processed image as new source to chain another AI tool"
+            >
+              <LayersIcon className="size-3.5 sm:mr-1.5" />
+              <span className="hidden md:inline">Chain Edit</span>
+            </Button>
+          )}
+
+          {activeToolName && !processedImage && (
             <span className="truncate rounded-full border border-primary/40 bg-primary/15 px-3 py-1 text-xs font-semibold text-primary shadow-[0_0_12px_rgba(255,140,0,0.2)]">
               {activeToolName}
             </span>
@@ -302,6 +338,25 @@ export function CanvasViewer({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Format Selector Pill */}
+          <div className="hidden sm:flex items-center rounded-full border border-white/15 bg-white/5 p-0.5 text-[10px] font-bold">
+            {(["png", "webp", "jpg"] as ExportFormat[]).map((fmt) => (
+              <button
+                key={fmt}
+                type="button"
+                onClick={() => setExportFormat(fmt)}
+                className={cn(
+                  "rounded-full px-2 py-0.5 uppercase transition-all cursor-pointer",
+                  exportFormat === fmt
+                    ? "bg-primary text-black shadow-sm"
+                    : "text-muted-foreground hover:text-white"
+                )}
+              >
+                {fmt}
+              </button>
+            ))}
+          </div>
+
           <Button
             variant="outline"
             size="sm"
@@ -310,7 +365,7 @@ export function CanvasViewer({
             title="Copy Image Link"
           >
             <Share2Icon className="size-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">{copied ? "Copied!" : "Copy Link"}</span>
+            <span className="hidden sm:inline">{copied ? "Copied!" : "Copy"}</span>
           </Button>
 
           <Button
@@ -321,7 +376,7 @@ export function CanvasViewer({
           >
             <DownloadIcon className="size-3.5 sm:mr-1.5" />
             <span>Download</span>
-            <span className="hidden sm:inline ml-0.5">HD</span>
+            <span className="hidden sm:inline ml-1 uppercase">.{exportFormat}</span>
           </Button>
         </div>
       </div>
@@ -343,7 +398,7 @@ export function CanvasViewer({
             </div>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
               <span className="size-2 rounded-full bg-primary animate-ping" />
-              Uploading...
+              Uploading to Cloud CDN
             </div>
             <p className="mt-2 max-w-xs truncate text-base font-bold text-foreground">
               {uploadingFileName || "Uploading Image..."}
@@ -373,27 +428,18 @@ export function CanvasViewer({
               animate={{ scale: 1, opacity: 1, y: 0 }}
               className="relative z-20 flex flex-col items-center max-w-sm w-full rounded-3xl border border-primary/40 bg-card/90 p-6 sm:p-7 backdrop-blur-2xl shadow-[0_25px_70px_rgba(0,0,0,0.95),0_0_50px_rgba(255,90,20,0.28)] text-center overflow-hidden"
             >
-              {/* Top specular golden line */}
               <div className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-amber-400 to-transparent pointer-events-none" />
-
-              {/* Ambient warm corner glow */}
               <div className="pointer-events-none absolute -right-12 -top-12 size-36 rounded-full bg-primary/25 blur-3xl" />
 
-              {/* Multi-Ring Glowing Neural Core */}
               <div className="relative flex size-20 items-center justify-center mb-4">
-                {/* Ping wave */}
                 <div className="absolute size-20 rounded-full bg-primary/20 animate-ping" />
-                {/* Rotating dashed ring */}
                 <div className="absolute size-20 rounded-full border border-dashed border-primary/50 animate-[spin_8s_linear_infinite]" />
-                {/* Counter-rotating segmented ring */}
                 <div className="absolute size-14 rounded-full border-t-2 border-b-2 border-amber-400 animate-[spin_3s_linear_infinite_reverse]" />
-                {/* Glowing center orb */}
                 <div className="relative flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-orange-500 to-amber-500 text-white shadow-[0_0_25px_rgba(255,90,20,0.6)]">
                   <Wand2Icon className="size-6 animate-pulse" />
                 </div>
               </div>
 
-              {/* Status Pill Badge */}
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 text-[11px] font-semibold text-primary backdrop-blur-md">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
@@ -402,7 +448,6 @@ export function CanvasViewer({
                 <span className="uppercase tracking-wider">Aura Neural Vision Engine</span>
               </div>
 
-              {/* Dynamic Phase Title & Description */}
               <h4 className="mt-3.5 text-base sm:text-lg font-bold text-white tracking-tight">
                 {processingStages[processingStep].title}
               </h4>
@@ -410,7 +455,6 @@ export function CanvasViewer({
                 {processingStages[processingStep].desc}
               </p>
 
-              {/* Live Animated Progress Bar */}
               <div className="mt-4 w-full">
                 <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 mb-1.5">
                   <span>STAGE {processingStages[processingStep].step} OF 04</span>
@@ -425,7 +469,6 @@ export function CanvasViewer({
                 </div>
               </div>
 
-              {/* Security & Quality Tag */}
               <p className="mt-3 text-[10px] text-zinc-500 font-medium">
                 Hardware-accelerated cloud GPU pipeline • 100% Lossless
               </p>
@@ -486,20 +529,31 @@ export function CanvasViewer({
       </div>
 
       {/* Canvas Footnote Status Bar */}
-      <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-3.5 py-2 text-xs text-muted-foreground backdrop-blur-md shadow-inner">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/30 px-3.5 py-2 text-xs text-muted-foreground backdrop-blur-md shadow-inner">
         <span className="flex items-center gap-1.5">
-          <CheckCircle2Icon className="size-3.5 text-primary" />
+          <CheckCircle2Icon className="size-3.5 text-primary shrink-0" />
           {processedImage
-            ? "Drag center slider horizontally to compare before/after details"
+            ? "Drag center slider to compare, or click 'Chain Edit' to stack another tool"
             : "Image loaded and calibrated for neural transformations"}
         </span>
-        <button
-          type="button"
-          onClick={onUploadClick}
-          className="flex items-center gap-1.5 font-semibold text-primary hover:text-white transition-colors cursor-pointer"
-        >
-          <RefreshCwIcon className="size-3" /> Change image
-        </button>
+        <div className="flex items-center gap-3">
+          {processedImage && onChainResult && (
+            <button
+              type="button"
+              onClick={() => onChainResult(processedImage)}
+              className="flex md:hidden items-center gap-1 font-semibold text-amber-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <LayersIcon className="size-3" /> Chain Edit
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onUploadClick}
+            className="flex items-center gap-1.5 font-semibold text-primary hover:text-white transition-colors cursor-pointer"
+          >
+            <RefreshCwIcon className="size-3" /> Change image
+          </button>
+        </div>
       </div>
     </div>
   );

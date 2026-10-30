@@ -6,6 +6,7 @@ import { STUDIO_TOOLS, type StudioTool } from "@/lib/tools-config";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
+  CreditCardIcon,
   CrownIcon,
   KeyRoundIcon,
   LayersIcon,
@@ -15,6 +16,7 @@ import {
   Wand2Icon,
   ZapIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ToolControlsProps {
   selectedToolId: string;
@@ -53,6 +55,7 @@ interface ToolControlsProps {
     hourlyRemaining?: number;
     isHourlyCapped?: boolean;
     resetInMinutes?: number;
+    hasStripeCustomer?: boolean;
   } | null;
   onOpenUpgradeModal: () => void;
   onOpenConfigModal?: () => void;
@@ -110,13 +113,12 @@ export function ToolControls({
   onOpenConfigModal,
   hasCustomConfig,
 }: ToolControlsProps) {
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+
   const selectedTool =
     STUDIO_TOOLS.find((t) => t.id === selectedToolId) || STUDIO_TOOLS[0];
   const isPro = Boolean(isProProp || usageData?.plan === "PRO");
 
-  // =========================================================================
-  // CONCEPT 1: CATEGORY TABS SYSTEM (ACTIVE)
-  // =========================================================================
   const enhanceCount = STUDIO_TOOLS.filter(
     (t) => t.category === "enhance",
   ).length;
@@ -149,7 +151,6 @@ export function ToolControls({
     (selectedTool.category as CategoryId) || "background",
   );
 
-  // Sync category if tool is selected externally
   React.useEffect(() => {
     if (selectedTool?.category && selectedTool.category !== activeCategory) {
       setActiveCategory(selectedTool.category as CategoryId);
@@ -167,21 +168,23 @@ export function ToolControls({
     }
   };
 
+  const handleManageBilling = async () => {
+    try {
+      setIsOpeningPortal(true);
+      const res = await fetch("/api/billing-portal", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to open billing portal");
+      if (data.url) window.location.href = data.url;
+    } catch (err: any) {
+      toast.error(err?.message || "Could not open Stripe billing portal");
+    } finally {
+      setIsOpeningPortal(false);
+    }
+  };
+
   const filteredTools = STUDIO_TOOLS.filter(
     (t) => t.category === activeCategory,
   );
-
-  /* =========================================================================
-   * PREVIOUS VERSION BACKUP: 6-TOOL DEFAULT WITH "VIEW ALL" TOGGLE
-   * (Preserved for comparison as requested)
-   * -------------------------------------------------------------------------
-   * const DEFAULT_VISIBLE_COUNT = 6;
-   * const [showAllTools, setShowAllTools] = useState(false);
-   * const isSelectedInHidden = STUDIO_TOOLS.slice(DEFAULT_VISIBLE_COUNT).some((t) => t.id === selectedToolId);
-   * const isExpanded = showAllTools || isSelectedInHidden;
-   * const displayedTools = isExpanded ? STUDIO_TOOLS : STUDIO_TOOLS.slice(0, DEFAULT_VISIBLE_COUNT);
-   * =========================================================================
-   */
 
   return (
     <div className="studio-panel flex flex-col gap-4 sm:gap-5 rounded-[2rem] border border-border/60 p-4 sm:p-5">
@@ -190,29 +193,35 @@ export function ToolControls({
           <div className="flex size-9 sm:size-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
             {isPro ? (
               <CrownIcon className="size-5" />
+            ) : hasCustomConfig ? (
+              <KeyRoundIcon className="size-5 text-emerald-400" />
             ) : (
               <ZapIcon className="size-5" />
             )}
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">
-              {isPro
-                ? usageData?.isHourlyCapped
-                  ? "Hourly Limit Reached"
-                  : "Aura Pro Active"
-                : `${usageData?.remaining ?? 3} Free Credits Left`}
+              {hasCustomConfig
+                ? "Unlimited BYOK Mode Active"
+                : isPro
+                  ? usageData?.isHourlyCapped
+                    ? "Hourly Limit Reached"
+                    : "Aura Pro Active"
+                  : `${usageData?.remaining ?? 3} Free Credits Left`}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isPro
-                ? usageData?.isHourlyCapped
-                  ? `${usageData?.hourlyLimit ?? 8}/${usageData?.hourlyLimit ?? 8} hourly edits used. Unlocks in ${usageData?.resetInMinutes || 1}m`
-                  : `${usageData?.hourlyRemaining ?? 8} of ${usageData?.hourlyLimit ?? 8} hourly edits available`
-                : `${usageData?.usageCount ?? 0} of ${usageData?.usageLimit ?? 3} free edits used`}
+              {hasCustomConfig
+                ? "Running directly on your custom ImageKit quota"
+                : isPro
+                  ? usageData?.isHourlyCapped
+                    ? `${usageData?.hourlyLimit ?? 15}/${usageData?.hourlyLimit ?? 15} hourly edits used. Unlocks in ${usageData?.resetInMinutes || 1}m`
+                    : `${usageData?.hourlyRemaining ?? 15} of ${usageData?.hourlyLimit ?? 15} hourly edits available`
+                  : `${usageData?.usageCount ?? 0} of ${usageData?.usageLimit ?? 3} free edits used`}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {onOpenConfigModal && (
             <button
               type="button"
@@ -225,6 +234,19 @@ export function ToolControls({
                 {hasCustomConfig ? "Custom Keys Active" : "BYOK API Keys"}
               </span>
             </button>
+          )}
+
+          {isPro && usageData?.hasStripeCustomer && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleManageBilling}
+              disabled={isOpeningPortal}
+              className="h-8 rounded-full border-white/15 bg-white/5 px-3 text-xs font-medium text-foreground hover:bg-white/10 cursor-pointer"
+            >
+              <CreditCardIcon className="mr-1.5 size-3.5 text-primary" />
+              {isOpeningPortal ? "Opening..." : "Billing"}
+            </Button>
           )}
 
           {!isPro && (
@@ -498,7 +520,6 @@ export function ToolControls({
                 />
               </div>
 
-              {/* Compact 2-column controls: Font Size & Color Palette */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="rounded-xl border border-white/10 bg-black/25 p-2">
                   <div className="flex items-center justify-between text-[11px] mb-1">
@@ -549,7 +570,6 @@ export function ToolControls({
                 </div>
               </div>
 
-              {/* Position Selector (1 clean 5-column row) */}
               <div>
                 <span className="text-[11px] font-medium text-muted-foreground block mb-1">
                   Position
@@ -573,7 +593,6 @@ export function ToolControls({
                 </div>
               </div>
 
-              {/* Glass Badge Background Toggle */}
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/20 px-2.5 py-1.5">
                 <div>
                   <p className="text-xs font-semibold text-foreground">
@@ -626,7 +645,7 @@ export function ToolControls({
         disabled={
           !canApply ||
           isProcessing ||
-          Boolean(isPro && usageData?.isHourlyCapped)
+          Boolean(!hasCustomConfig && isPro && usageData?.isHourlyCapped)
         }
         className="studio-primary-action h-14 w-full rounded-full text-base font-semibold shadow-lg cursor-pointer disabled:cursor-not-allowed"
       >
@@ -635,7 +654,7 @@ export function ToolControls({
             <Loader2Icon className="mr-2 size-5 animate-spin" /> Processing AI
             Transformation...
           </>
-        ) : isPro && usageData?.isHourlyCapped ? (
+        ) : !hasCustomConfig && isPro && usageData?.isHourlyCapped ? (
           <>
             <span>
               Hourly Limit Reached (15/15) • Resets in{" "}

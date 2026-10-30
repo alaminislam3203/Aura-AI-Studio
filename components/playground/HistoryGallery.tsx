@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronDownIcon, ChevronUpIcon, DownloadIcon, HistoryIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, DownloadIcon, HistoryIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { saveAs } from "file-saver";
 
@@ -19,11 +19,17 @@ interface HistoryGalleryProps {
   history: GenerationItem[];
   isLoading?: boolean;
   onSelectResult: (originalUrl: string, resultUrl: string, toolType: string) => void;
+  onDeleteItem?: (id: string) => void;
 }
 
 const DEFAULT_LIMIT = 8;
 
-export function HistoryGallery({ history, isLoading = false, onSelectResult }: HistoryGalleryProps) {
+export function HistoryGallery({
+  history,
+  isLoading = false,
+  onSelectResult,
+  onDeleteItem,
+}: HistoryGalleryProps) {
   const [showAll, setShowAll] = useState(false);
 
   if (isLoading) {
@@ -70,6 +76,11 @@ export function HistoryGallery({ history, isLoading = false, onSelectResult }: H
   const handleDownload = (e: React.MouseEvent, item: GenerationItem) => {
     e.stopPropagation();
     saveAs(item.resultImageUrl, `aura-${item.toolType}-${item.id.slice(0, 6)}.png`);
+  };
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    onDeleteItem?.(id);
   };
 
   return (
@@ -125,18 +136,30 @@ export function HistoryGallery({ history, isLoading = false, onSelectResult }: H
             </div>
 
             <div className="p-2.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-1">
                 <span className="truncate rounded-md bg-primary/15 border border-primary/30 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                   {item.toolType}
                 </span>
-                <button
-                  type="button"
-                  onClick={(e) => handleDownload(e, item)}
-                  className="rounded-full p-1 text-muted-foreground hover:bg-white/10 hover:text-foreground cursor-pointer transition-colors"
-                  title="Download Image"
-                >
-                  <DownloadIcon className="size-3.5" />
-                </button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => handleDownload(e, item)}
+                    className="rounded-full p-1 text-muted-foreground hover:bg-white/10 hover:text-foreground cursor-pointer transition-colors"
+                    title="Download Image"
+                  >
+                    <DownloadIcon className="size-3.5" />
+                  </button>
+                  {onDeleteItem && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(e, item.id)}
+                      className="rounded-full p-1 text-muted-foreground hover:bg-rose-500/20 hover:text-rose-400 cursor-pointer transition-colors"
+                      title="Delete from History"
+                    >
+                      <Trash2Icon className="size-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
