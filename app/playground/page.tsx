@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
@@ -9,7 +10,6 @@ import { ApiConfigModal } from "@/components/modals/ApiConfigModal";
 import { getCustomImageKitConfig, BYOK_CHANGE_EVENT } from "@/lib/byok-storage";
 import { isAdminEmail } from "@/lib/admin-auth";
 import {
-  ArrowLeftIcon,
   CrownIcon,
   KeyRoundIcon,
   LogInIcon,
@@ -40,21 +40,28 @@ export default function PlaygroundPage() {
       <div className="mx-auto max-w-[1440px]">
         {/* Header Bar - Responsive Single Row */}
         <header className="mb-5 flex items-center justify-between gap-2 sm:mb-8">
-          {/* Left: Back Home + Logo */}
+          {/* Logo + Logo Name */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-muted-foreground transition-all hover:border-primary/50 hover:bg-white/10 hover:text-foreground shrink-0"
-              title="Back Home"
-            >
-              <ArrowLeftIcon className="size-3.5" />
-              <span className="hidden sm:inline">Back Home</span>
-            </Link>
-
-            <Link href="/" className="group flex min-w-0 items-center gap-2 sm:gap-3">
-              <p className="font-mono text-xl sm:text-2xl font-bold uppercase tracking-wider text-primary truncate">
-                Aura Studio
-              </p>
+            <Link href="/" className="home-brand">
+              <span className="relative mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-visible sm:mr-2 sm:h-10 sm:w-10">
+                <Image
+                  src="/logo.png"
+                  alt="Aura Studio"
+                  width={500}
+                  height={500}
+                  unoptimized
+                  className="h-9 w-9 max-h-none max-w-none origin-left scale-[1.5] object-contain sm:h-10 sm:w-10 sm:scale-[1.55]"
+                  priority
+                />
+              </span>
+              <div className="min-w-0">
+                <span className="caps-2xs block text-xs font-semibold text-foreground sm:text-sm whitespace-nowrap">
+                  Aura Studio
+                </span>
+                <span className="caps-xs hidden sm:block truncate text-[10px] uppercase text-primary sm:text-xs">
+                  AI Image Studio
+                </span>
+              </div>
             </Link>
           </div>
 

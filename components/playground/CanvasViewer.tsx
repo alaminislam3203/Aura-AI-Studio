@@ -398,7 +398,7 @@ export function CanvasViewer({
             </div>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
               <span className="size-2 rounded-full bg-primary animate-ping" />
-              Uploading to Cloud CDN
+              Uploading...
             </div>
             <p className="mt-2 max-w-xs truncate text-base font-bold text-foreground">
               {uploadingFileName || "Uploading Image..."}
