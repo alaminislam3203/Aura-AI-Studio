@@ -1,0 +1,52 @@
+{
+  "name": "aura-studio",
+  "version": "0.1.0",
+  "private": true,
+  "author": {
+    "name": "Al Amin Islam",
+    "email": "alaminislam3203@gmail.com",
+    "github": "https://github.com/alaminislam3203"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@imagekit/next": "^2.1.5",
+    "@imagekit/nodejs": "^7.3.0",
+    "@prisma/client": "^6.15.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "file-saver": "^2.0.5",
+    "lucide-react": "^1.7.0",
+    "motion": "^12.38.0",
+    "next": "16.1.6",
+    "next-auth": "^4.24.15",
+    "next-themes": "^0.4.6",
+    "radix-ui": "^1.4.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "shadcn": "^4.1.0",
+    "sonner": "^2.0.8",
+    "stripe": "^18.5.0",
+    "tailwind-merge": "^3.5.0",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "prisma": "^6.15.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
