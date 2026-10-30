@@ -651,3 +651,4 @@ export function AuthPortal({ initialMode = "login" }: AuthPortalProps) {
     </main>
   );
 }
+
