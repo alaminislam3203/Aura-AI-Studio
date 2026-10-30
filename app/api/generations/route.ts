@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -35,13 +35,15 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const isByok = request.headers.get("x-byok-active") === "true";
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     const isPro = user.plan === "PRO";
-    const PRO_HOURLY_LIMIT = 8;
+    const PRO_HOURLY_LIMIT = 15;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const hourlyCount = await prisma.generation.count({
       where: {
@@ -62,7 +64,7 @@ export async function POST(request: Request) {
       },
     });
 
-    if (isPro && hourlyCount >= PRO_HOURLY_LIMIT) {
+    if (!isByok && isPro && hourlyCount >= PRO_HOURLY_LIMIT) {
       return NextResponse.json(
         { error: `Hourly rate limit reached (${PRO_HOURLY_LIMIT} generations/hour). Please wait for the window to reset.` },
         { status: 429 }
@@ -91,5 +93,41 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Save generation error:", error);
     return NextResponse.json({ error: "Failed to save generation" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "Missing generation id" }, { status: 400 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    await prisma.generation.deleteMany({
+      where: {
+        id,
+        userId: user.id,
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete generation error:", error);
+    return NextResponse.json({ error: "Failed to delete generation" }, { status: 500 });
   }
 }

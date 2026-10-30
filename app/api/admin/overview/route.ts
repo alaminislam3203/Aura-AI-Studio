@@ -27,6 +27,7 @@ export async function GET() {
       recentUsers,
       recentGenerations,
       recentSubscriptions,
+      groupedTools,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { plan: "PRO" } }),
@@ -79,7 +80,27 @@ export async function GET() {
           },
         },
       }),
+      prisma.generation.groupBy({
+        by: ["toolType"],
+        _count: {
+          toolType: true,
+        },
+        orderBy: {
+          _count: {
+            toolType: "desc",
+          },
+        },
+      }),
     ]);
+
+    const toolBreakdown = groupedTools.map((g) => ({
+      toolType: g.toolType,
+      count: g._count.toolType,
+      percentage:
+        totalGenerations > 0
+          ? Math.round((g._count.toolType / totalGenerations) * 100)
+          : 0,
+    }));
 
     return NextResponse.json({
       stats: {
@@ -89,8 +110,9 @@ export async function GET() {
         totalGenerations,
         totalSubscriptions,
         activeSubscriptions,
-        estimatedMrr: activeSubscriptions * 19,
+        estimatedMrr: Math.max(activeSubscriptions, proUsers) * 19,
       },
+      toolBreakdown,
       users: recentUsers,
       generations: recentGenerations,
       subscriptions: recentSubscriptions,

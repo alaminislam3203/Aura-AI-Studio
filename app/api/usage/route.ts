@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const PRO_HOURLY_LIMIT = 8;
+const PRO_HOURLY_LIMIT = 15;
 const WINDOW_DURATION_MS = 60 * 60 * 1000; // 1 hour rolling window
 
 export async function GET() {
@@ -23,6 +23,7 @@ export async function GET() {
         plan: true,
         usageCount: true,
         usageLimit: true,
+        stripeCustomerId: true,
       },
     });
 
@@ -74,6 +75,7 @@ export async function GET() {
         hourlyRemaining: isPro ? Math.max(0, PRO_HOURLY_LIMIT - hourlyCount) : Math.max(0, user.usageLimit - user.usageCount),
         isHourlyCapped,
         resetInMinutes,
+        hasStripeCustomer: Boolean(user.stripeCustomerId),
       },
       {
         headers: {
@@ -87,13 +89,15 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const isByok = request.headers.get("x-byok-active") === "true";
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -138,11 +142,27 @@ export async function POST() {
       }
     }
 
+    // If user is using their own personal ImageKit API keys (BYOK), do not block or consume free credits
+    if (isByok) {
+      return NextResponse.json({
+        usageCount: user.usageCount,
+        usageLimit: isPro ? 999999 : user.usageLimit,
+        plan: user.plan,
+        canUpload: true,
+        remaining: isPro ? 999999 : Math.max(0, user.usageLimit - user.usageCount),
+        hourlyCount,
+        hourlyLimit: isPro ? PRO_HOURLY_LIMIT : user.usageLimit,
+        hourlyRemaining: isPro ? Math.max(0, PRO_HOURLY_LIMIT - hourlyCount) : Math.max(0, user.usageLimit - user.usageCount),
+        resetInMinutes,
+        byokBypass: true,
+      });
+    }
+
     // 1. Check PRO hourly rate limit (15 generations / hour)
     if (isPro && hourlyCount >= PRO_HOURLY_LIMIT) {
       return NextResponse.json(
         {
-          error: `Hourly rate limit reached (15 generations/hour). Next edit unlocks in ${resetInMinutes} minute${resetInMinutes === 1 ? "" : "s"}.`,
+          error: `Hourly rate limit reached (${PRO_HOURLY_LIMIT} generations/hour). Next edit unlocks in ${resetInMinutes} minute${resetInMinutes === 1 ? "" : "s"}.`,
           rateLimited: true,
           hourlyCount,
           hourlyLimit: PRO_HOURLY_LIMIT,
@@ -153,7 +173,7 @@ export async function POST() {
       );
     }
 
-    // 2. Check FREE tier lifetime limit (3 credits)
+    // 2. Check FREE tier lifetime limit
     if (!isPro && user.usageCount >= user.usageLimit) {
       return NextResponse.json(
         {
