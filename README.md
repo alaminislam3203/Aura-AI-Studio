@@ -1,4 +1,4 @@
-# Aura Studio
+# Aura AI Studio
 
 A high-performance web platform for AI-powered image isolation, prompt-guided background generation, super-resolution upscaling, and dynamic branding overlays.
 
