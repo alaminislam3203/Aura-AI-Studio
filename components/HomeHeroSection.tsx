@@ -132,21 +132,21 @@ export function HomeHeroSection() {
               <span className="relative mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-visible sm:mr-2 sm:h-10 sm:w-10">
                 <Image
                   src="/logo.png"
-                  alt="Aura Studio"
+                  alt="Aura AI Studio"
                   width={72}
                   height={72}
                   className="h-9 w-9 max-h-none max-w-none origin-left scale-[1.5] object-cover sm:h-10 sm:w-10 sm:scale-[1.55]"
                   priority
                 />
               </span>
-              <div className="min-w-0">
+              {/* <div className="min-w-0">
                 <span className="caps-2xs block text-xs font-semibold text-foreground sm:text-sm whitespace-nowrap">
-                  Aura Studio
+                  Aura AI Studio
                 </span>
                 <span className="caps-xs hidden sm:block truncate text-[10px] uppercase text-primary sm:text-xs">
                   AI Image Studio
                 </span>
-              </div>
+              </div> */}
             </Link>
 
             <div className="hidden md:flex items-center justify-center gap-1.5 lg:gap-2.5">

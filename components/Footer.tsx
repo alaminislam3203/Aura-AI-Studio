@@ -28,20 +28,20 @@ export function Footer() {
                 <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-visible">
                   <Image
                     src="/logo.png"
-                    alt="Aura Studio"
+                    alt="Aura AI Studio"
                     width={72}
                     height={72}
                     className="h-10 w-10 max-h-none max-w-none origin-left scale-[1.5] object-cover transition-transform duration-300 group-hover:scale-[1.6]"
                   />
                 </span>
-                <div>
+                {/* <div>
                   <span className="block text-base font-bold tracking-tight text-white group-hover:text-primary transition-colors">
-                    Aura Studio
+                    Aura AI Studio
                   </span>
                   <span className="block text-[11px] font-semibold uppercase tracking-wider text-primary">
                     AI Vision Engine
                   </span>
-                </div>
+                </div> */}
               </Link>
 
               <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
