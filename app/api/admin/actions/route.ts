@@ -113,12 +113,10 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: "Unknown admin action" }, { status: 400 });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Admin action error:", error);
-    return NextResponse.json(
-      { error: error?.message || "Failed to execute admin action" },
-      { status: 500 }
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to execute admin action";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
