@@ -140,14 +140,6 @@ export function HomeHeroSection() {
                   priority
                 />
               </span>
-              <div className="min-w-0">
-                <span className="caps-2xs block text-xs font-semibold text-foreground sm:text-sm whitespace-nowrap">
-                  Aura Studio
-                </span>
-                <span className="caps-xs hidden sm:block truncate text-[10px] uppercase text-primary sm:text-xs">
-                  AI Image Studio
-                </span>
-              </div>
             </Link>
 
             <div className="hidden md:flex items-center justify-center gap-1.5 lg:gap-2.5">

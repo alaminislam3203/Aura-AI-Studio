@@ -35,14 +35,6 @@ export function Footer() {
                     className="h-10 w-10 max-h-none max-w-none origin-left scale-[1.5] object-contain transition-transform duration-300 group-hover:scale-[1.6]"
                   />
                 </span>
-                <div>
-                  <span className="block text-base font-bold tracking-tight text-white group-hover:text-primary transition-colors">
-                    Aura Studio
-                  </span>
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-primary">
-                    AI Vision Engine
-                  </span>
-                </div>
               </Link>
 
               <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
