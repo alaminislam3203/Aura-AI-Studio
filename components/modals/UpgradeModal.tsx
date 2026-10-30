@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckIcon, CrownIcon, Loader2Icon, SparklesIcon, ZapIcon } from "lucide-react";
+import { CheckIcon, CrownIcon, Loader2Icon, ZapIcon } from "lucide-react";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -32,8 +32,8 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
       if (data.url) {
         window.location.href = data.url;
       }
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
       setIsLoading(false);
     }
   };
@@ -49,7 +49,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
             Upgrade to Aura Pro
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            You've used all 3 free image credits. Upgrade to unlock unlimited creative power.
+            You&apos;ve used all 3 free image credits. Upgrade to unlock unlimited creative power.
           </DialogDescription>
         </DialogHeader>
 

@@ -39,7 +39,6 @@ export const TestimonialsColumn = (props: {
                 >
                   <div>{text}</div>
                   <div className="mt-5 flex items-center gap-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       width={40}
                       height={40}
